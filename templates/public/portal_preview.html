@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}HydroPulse: Community Water Quality Monitoring & Management System{% endblock %}
+
+{% block content %}
+<div class="py-5 text-center">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="d-inline-flex p-3 rounded-4 bg-primary bg-opacity-10 text-primary mb-3">
+        <i class="bi bi-droplet-half display-4"></i>
+      </div>
+      <h1 class="display-5 fw-bold text-dark mb-3">HydroPulse Water Monitoring</h1>
+      <p class="lead text-secondary mb-4">
+        A centralized digital platform monitoring communal wells and local water refilling stations to safeguard community drinking water under <strong>SDG 6</strong> and <strong>SDG 3</strong>.
+      </p>
+
+      <div class="d-flex justify-content-center gap-3 mb-5">
+        {% if user.is_authenticated %}
+          <a href="{% url 'core:dashboard' %}" class="btn btn-primary btn-lg px-4 shadow-sm">
+            <i class="bi bi-speedometer2 me-2"></i> Go to Staff Dashboard
+          </a>
+        {% else %}
+          <a href="{% url 'core:login' %}" class="btn btn-primary btn-lg px-4 shadow-sm">
+            <i class="bi bi-lock-fill me-2"></i> Staff Sign In
+          </a>
+        {% endif %}
+      </div>
+
+      <!-- Overview Cards -->
+      <div class="row g-4 text-start">
+        <div class="col-md-4">
+          <div class="card hp-card h-100 p-4">
+            <div class="hp-stat-icon bg-info bg-opacity-10 text-info mb-3">
+              <i class="bi bi-shield-check"></i>
+            </div>
+            <h5 class="fw-bold">PNSDW 2017 Compliance</h5>
+            <p class="text-muted small mb-0">Automated safety evaluations of pH, turbidity, and TDS parameters with instant threshold checks.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card hp-card h-100 p-4">
+            <div class="hp-stat-icon bg-warning bg-opacity-10 text-warning mb-3">
+              <i class="bi bi-bell"></i>
+            </div>
+            <h5 class="fw-bold">Early Warning Alerts</h5>
+            <p class="text-muted small mb-0">Rapid automated alerting triggers notifications to local health officers when contamination is detected.</p>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card hp-card h-100 p-4">
+            <div class="hp-stat-icon bg-success bg-opacity-10 text-success mb-3">
+              <i class="bi bi-people"></i>
+            </div>
+            <h5 class="fw-bold">Community Transparency</h5>
+            <p class="text-muted small mb-0">No-login public portal provides community residents real-time visibility into local drinking water safety.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

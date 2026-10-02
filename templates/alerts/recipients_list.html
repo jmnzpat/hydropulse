@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Alert Recipients | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-people-fill text-primary me-2"></i>Alert Notification Recipients</h3>
+    <p class="text-muted small mb-0">Officials, health officers, and technicians registered to receive automated water contamination alerts.</p>
+  </div>
+  <a href="{% url 'core:notification_recipient_create' %}" class="btn btn-primary btn-sm shadow-sm" id="btn-add-recipient">
+    <i class="bi bi-person-plus me-1"></i> Add Recipient
+  </a>
+</div>
+
+{% if is_mock_mode %}
+  <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+    <i class="bi bi-info-circle-fill me-2 fs-5"></i>
+    <div>
+      <strong>Simulation Mode Active.</strong>
+      Notifications are <em>logged and simulated</em> but not actually sent via email or SMS.
+      Configure <code>NOTIFICATION_MOCK_MODE = False</code> in System Settings for production delivery.
+    </div>
+  </div>
+{% endif %}
+
+<div class="card hp-card">
+  <div class="card-body p-0">
+    {% if recipients %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Name & Role</th>
+              <th>Contact</th>
+              <th>Channels</th>
+              <th>Barangay Filter</th>
+              <th>Status</th>
+              <th class="pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in recipients %}
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-semibold">{{ r.name }}</div>
+                  <small class="text-muted">{{ r.role_title }}</small>
+                </td>
+                <td>
+                  {% if r.email %}
+                    <div class="small"><i class="bi bi-envelope text-muted me-1"></i>{{ r.email }}</div>
+                  {% endif %}
+                  {% if r.phone_number %}
+                    <div class="small"><i class="bi bi-phone text-muted me-1"></i>{{ r.phone_number }}</div>
+                  {% endif %}
+                  {% if not r.email and not r.phone_number %}
+                    <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.receive_email %}
+                    <span class="badge bg-primary me-1">Email</span>
+                  {% endif %}
+                  {% if r.receive_sms %}
+                    <span class="badge bg-info text-dark">SMS</span>
+                  {% endif %}
+                  {% if not r.receive_email and not r.receive_sms %}
+                    <span class="text-muted small">None</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if r.barangay_filter %}
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary">{{ r.barangay_filter }}</span>
+                  {% else %}
+                    <span class="badge bg-success bg-opacity-25 text-success">All Barangays</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url 'core:notification_recipient_toggle' r.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm {% if r.is_active %}btn-success{% else %}btn-outline-secondary{% endif %}"
+                            type="submit" id="btn-toggle-recipient-{{ r.id }}"
+                            title="{% if r.is_active %}Deactivate{% else %}Activate{% endif %}">
+                      {% if r.is_active %}
+                        <i class="bi bi-toggle-on"></i> Active
+                      {% else %}
+                        <i class="bi bi-toggle-off"></i> Inactive
+                      {% endif %}
+                    </button>
+                  </form>
+                </td>
+                <td class="pe-3">
+                  <div class="d-flex gap-1">
+                    <a href="{% url 'core:notification_recipient_edit' r.id %}" class="btn btn-sm btn-outline-secondary" id="btn-edit-recipient-{{ r.id }}" title="Edit">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'core:notification_test_send' r.id %}" class="btn btn-sm btn-outline-info" id="btn-test-recipient-{{ r.id }}" title="Send Test Notification">
+                      <i class="bi bi-send"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-person-x display-4 d-block mb-3 opacity-50"></i>
+        <p class="fw-semibold">No recipients registered.</p>
+        <p class="small">Add government officials and sanitary health officers to receive automated contamination alerts.</p>
+        <a href="{% url 'core:notification_recipient_create' %}" class="btn btn-primary btn-sm">
+          <i class="bi bi-person-plus me-1"></i> Add First Recipient
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Quick Help -->
+<div class="card hp-card mt-4 border-info">
+  <div class="card-body p-3">
+    <h6 class="fw-bold text-info mb-2"><i class="bi bi-lightbulb me-1"></i> How Notifications Work</h6>
+    <ul class="mb-0 small text-muted">
+      <li>When a water quality record is encoded and evaluated as <strong>UNSAFE</strong> or <strong>CAUTION</strong>, the system automatically creates an alert and dispatches notifications.</li>
+      <li>Recipients with an <em>empty Barangay Filter</em> receive all municipality-wide alerts.</li>
+      <li>Recipients with a <em>specific Barangay Filter</em> only receive alerts for that barangay.</li>
+      <li>In <strong>Simulation Mode</strong>, messages are only logged — nothing is actually sent. Safe for testing during project defense.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="{% url 'core:notification_logs' %}" class="btn btn-outline-secondary btn-sm" id="btn-view-logs">
+    <i class="bi bi-journal-text me-1"></i> View Notification Transmission Logs
+  </a>
+</div>
+
+{% endblock %}

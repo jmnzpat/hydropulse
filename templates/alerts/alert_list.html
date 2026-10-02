@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Surveillance Alerts | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-bell-fill text-danger me-2"></i>Water Contamination Alerts</h3>
+    <p class="text-muted mb-0 small">Automated safety alerts generated from non-compliant water quality readings.</p>
+  </div>
+  {% if can_manage %}
+    <a href="{% url 'core:notification_recipients' %}" class="btn btn-outline-secondary btn-sm shadow-sm">
+      <i class="bi bi-people me-1"></i> Manage Recipients
+    </a>
+  {% endif %}
+</div>
+
+<!-- Status Badge Tabs -->
+<div class="d-flex gap-2 mb-4 flex-wrap">
+  <a href="?status=NEW{% if selected_severity %}&severity={{ selected_severity }}{% endif %}{% if selected_barangay %}&barangay={{ selected_barangay }}{% endif %}{% if query %}&q={{ query }}{% endif %}"
+     class="badge text-decoration-none fs-6 py-2 px-3 {% if selected_status == 'NEW' %}bg-danger{% else %}bg-danger bg-opacity-25 text-danger{% endif %}">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i> New
+    <span class="badge bg-white text-danger ms-1">{{ new_count }}</span>
+  </a>
+  <a href="?status=ACKNOWLEDGED{% if selected_severity %}&severity={{ selected_severity }}{% endif %}{% if selected_barangay %}&barangay={{ selected_barangay }}{% endif %}{% if query %}&q={{ query }}{% endif %}"
+     class="badge text-decoration-none fs-6 py-2 px-3 {% if selected_status == 'ACKNOWLEDGED' %}bg-warning text-dark{% else %}bg-warning bg-opacity-25 text-warning{% endif %}">
+    <i class="bi bi-eye-fill me-1"></i> Acknowledged
+    <span class="badge bg-white text-warning ms-1">{{ ack_count }}</span>
+  </a>
+  <a href="?status=RESOLVED{% if selected_severity %}&severity={{ selected_severity }}{% endif %}{% if selected_barangay %}&barangay={{ selected_barangay }}{% endif %}{% if query %}&q={{ query }}{% endif %}"
+     class="badge text-decoration-none fs-6 py-2 px-3 {% if selected_status == 'RESOLVED' %}bg-success{% else %}bg-success bg-opacity-25 text-success{% endif %}">
+    <i class="bi bi-check-circle-fill me-1"></i> Resolved
+    <span class="badge bg-white text-success ms-1">{{ resolved_count }}</span>
+  </a>
+  <a href="?" class="badge bg-secondary bg-opacity-25 text-secondary text-decoration-none fs-6 py-2 px-3">
+    <i class="bi bi-x-circle me-1"></i> Clear Filters
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="card hp-card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="row g-2 align-items-end" id="alert-filter-form">
+      <input type="hidden" name="status" value="{{ selected_status }}">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Search</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="Alert summary, source name…" class="form-control form-control-sm" id="alert-search-input">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Severity</label>
+        <select name="severity" class="form-select form-select-sm" id="alert-severity-filter">
+          <option value="">-- All Severities --</option>
+          <option value="CRITICAL" {% if selected_severity == 'CRITICAL' %}selected{% endif %}>🔴 Critical (UNSAFE)</option>
+          <option value="WARNING"  {% if selected_severity == 'WARNING'  %}selected{% endif %}>🟡 Warning (CAUTION)</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Barangay</label>
+        <select name="barangay" class="form-select form-select-sm" id="alert-barangay-filter">
+          <option value="">-- All Barangays --</option>
+          {% for b in distinct_barangays %}
+            <option value="{{ b }}" {% if selected_barangay == b %}selected{% endif %}>{{ b }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" id="alert-filter-btn"><i class="bi bi-funnel me-1"></i> Filter</button>
+        <a href="?" class="btn btn-outline-secondary btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Alert Table -->
+<div class="card hp-card">
+  <div class="card-body p-0">
+    {% if page_obj %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Severity</th>
+              <th>Water Source</th>
+              <th>Barangay</th>
+              <th>Summary</th>
+              <th>Status</th>
+              <th>Detected</th>
+              <th class="pe-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for alert in page_obj %}
+              <tr class="{% if alert.status == 'NEW' and alert.severity == 'CRITICAL' %}table-danger bg-opacity-25{% elif alert.status == 'NEW' %}table-warning bg-opacity-10{% endif %}">
+                <td class="ps-3">
+                  {% if alert.severity == 'CRITICAL' %}
+                    <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>CRITICAL</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-circle-fill me-1"></i>WARNING</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'core:source_detail' alert.source.id %}" class="fw-semibold text-decoration-none text-primary">
+                    {{ alert.source.name }}
+                  </a>
+                  <br><small class="text-muted">{{ alert.source.code }}</small>
+                </td>
+                <td><small>Brgy. {{ alert.source.barangay }}</small></td>
+                <td>
+                  <span class="small" title="{{ alert.summary }}">
+                    {{ alert.summary|truncatechars:80 }}
+                  </span>
+                </td>
+                <td>
+                  {% if alert.status == 'NEW' %}
+                    <span class="badge bg-danger">New</span>
+                  {% elif alert.status == 'ACKNOWLEDGED' %}
+                    <span class="badge bg-warning text-dark">Acknowledged</span>
+                  {% else %}
+                    <span class="badge bg-success">Resolved</span>
+                  {% endif %}
+                </td>
+                <td><small class="text-muted">{{ alert.created_at|date:"M d, Y H:i" }}</small></td>
+                <td class="pe-3">
+                  <a href="{% url 'core:alert_detail' alert.id %}" class="btn btn-sm btn-outline-primary" id="btn-alert-detail-{{ alert.id }}">
+                    <i class="bi bi-eye"></i> View
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-center py-3">
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ selected_status }}&severity={{ selected_severity }}&barangay={{ selected_barangay }}&q={{ query }}">&laquo;</a></li>
+              {% endif %}
+              <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ selected_status }}&severity={{ selected_severity }}&barangay={{ selected_barangay }}&q={{ query }}">&raquo;</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-shield-check display-4 d-block mb-3 text-success"></i>
+        <p class="fw-semibold">No alerts found.</p>
+        <p class="small">All monitored water sources are currently within safe parameters, or no filter matches were found.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

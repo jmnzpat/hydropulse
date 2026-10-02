@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}System Audit & Compliance Logs | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-journal-text text-primary me-2"></i> Audit & Compliance Logs</h3>
+    <p class="text-muted mb-0 small">Immutable trail of authentication events, water quality data edits, threshold adjustments, and alert resolutions.</p>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="card hp-card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <div class="input-group">
+          <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search by user, IP, or details...">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <select name="module" class="form-select">
+          <option value="">-- All Modules --</option>
+          {% for mod in distinct_modules %}
+            <option value="{{ mod }}" {% if module_filter == mod %}selected{% endif %}>{{ mod }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-secondary w-100">Filter</button>
+      </div>
+      {% if query or module_filter %}
+        <div class="col-auto">
+          <a href="{% url 'core:audit_logs' %}" class="btn btn-link text-decoration-none text-muted btn-sm">Clear</a>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Log Entries Table -->
+<div class="card hp-card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle mb-0 font-monospace" style="font-size: 0.88rem;">
+      <thead class="table-light font-sans-serif">
+        <tr>
+          <th>Timestamp (PHT)</th>
+          <th>Actor</th>
+          <th>Module</th>
+          <th>Action</th>
+          <th>IP Address</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in page_obj %}
+          <tr>
+            <td class="text-muted">{{ log.timestamp|date:"Y-m-d H:i:s" }}</td>
+            <td class="fw-semibold text-dark">{{ log.user_display }}</td>
+            <td><span class="badge bg-secondary-subtle text-secondary border">{{ log.module }}</span></td>
+            <td><span class="badge bg-primary-subtle text-primary border">{{ log.action }}</span></td>
+            <td class="text-muted">{{ log.ip_address }}</td>
+            <td class="text-wrap" style="max-width: 400px;">{{ log.details }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted font-sans-serif">
+              <i class="bi bi-clock-history display-6 d-block mb-2"></i>
+              No audit records found matching criteria.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+      <span class="small text-muted font-sans-serif">Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ query }}&module={{ module_filter }}">Previous</a></li>
+          {% endif %}
+          <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ query }}&module={{ module_filter }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

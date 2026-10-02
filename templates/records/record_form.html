@@ -1,0 +1,226 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-lg-10">
+    <div class="card hp-card">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clipboard2-pulse me-2 text-primary"></i> {{ title }}</h5>
+        <a href="{% url 'core:record_list' %}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i> Back to Records
+        </a>
+      </div>
+      <div class="card-body p-4">
+
+        <!-- Informational banner -->
+        <div class="alert alert-light border shadow-sm mb-4">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-shield-check text-primary fs-4 me-2"></i>
+            <div>
+              <strong>Automated Safety Evaluation Engine:</strong> Upon saving, your reading is instantly analyzed against Philippine National Standards for Drinking Water (PNSDW 2017). Readings outside safe limits automatically generate system alerts.
+            </div>
+          </div>
+        </div>
+
+        <form method="post" id="waterTestForm" novalidate>
+          {% csrf_token %}
+
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+              {% for error in form.non_field_errors %}
+                <div><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="row g-4">
+            <!-- Left Column: Inputs -->
+            <div class="col-lg-7">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Water Source <span class="text-danger">*</span></label>
+                {{ form.source }}
+                {% if form.source.errors %}<div class="text-danger small mt-1">{{ form.source.errors.0 }}</div>{% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Sampling Date & Time <span class="text-danger">*</span></label>
+                {{ form.tested_at }}
+                {% if form.tested_at.errors %}<div class="text-danger small mt-1">{{ form.tested_at.errors.0 }}</div>{% endif %}
+                <div class="form-text small">{{ form.tested_at.help_text }}</div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <!-- pH Level -->
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">pH Level <span class="text-danger">*</span></label>
+                  {{ form.ph_level }}
+                  {% if form.ph_level.errors %}<div class="text-danger small mt-1">{{ form.ph_level.errors.0 }}</div>{% endif %}
+                  <div class="form-text small">Safe: 6.5 &ndash; 8.5</div>
+                </div>
+
+                <!-- Turbidity -->
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">Turbidity (NTU) <span class="text-danger">*</span></label>
+                  {{ form.turbidity_ntu }}
+                  {% if form.turbidity_ntu.errors %}<div class="text-danger small mt-1">{{ form.turbidity_ntu.errors.0 }}</div>{% endif %}
+                  <div class="form-text small">Max Safe: 5.0 NTU</div>
+                </div>
+
+                <!-- TDS -->
+                <div class="col-md-4">
+                  <label class="form-label fw-semibold">TDS (mg/L) <span class="text-danger">*</span></label>
+                  {{ form.tds_ppm }}
+                  {% if form.tds_ppm.errors %}<div class="text-danger small mt-1">{{ form.tds_ppm.errors.0 }}</div>{% endif %}
+                  <div class="form-text small">Max Safe: 600 mg/L</div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Technician Observations & Notes</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors.0 }}</div>{% endif %}
+              </div>
+            </div>
+
+            <!-- Right Column: Live Safety Evaluation Preview Card -->
+            <div class="col-lg-5">
+              <div class="card bg-light border p-3 h-100">
+                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">
+                  <i class="bi bi-speedometer2 text-primary me-1"></i> Live Safety Evaluation Preview
+                </h6>
+
+                <div class="text-center py-3 bg-white rounded-3 border mb-3">
+                  <div class="text-muted small mb-1">Calculated Overall Status</div>
+                  <div id="previewOverallBadge">
+                    <span class="status-badge badge-untested fs-6"><i class="bi bi-hourglass-split"></i> Enter Values</span>
+                  </div>
+                </div>
+
+                <div class="small mb-3">
+                  <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>pH Status:</span>
+                    <span id="previewPhStatus" class="fw-bold text-muted">-</span>
+                  </div>
+                  <div class="d-flex justify-content-between py-1 border-bottom">
+                    <span>Turbidity Status:</span>
+                    <span id="previewTurbidityStatus" class="fw-bold text-muted">-</span>
+                  </div>
+                  <div class="d-flex justify-content-between py-1">
+                    <span>TDS Status:</span>
+                    <span id="previewTdsStatus" class="fw-bold text-muted">-</span>
+                  </div>
+                </div>
+
+                <div id="previewRemarksBox" class="alert alert-info py-2 px-3 small mb-0 d-none">
+                  <div class="fw-bold mb-1"><i class="bi bi-info-circle me-1"></i> Evaluation Remarks:</div>
+                  <ul id="previewRemarksList" class="mb-0 ps-3"></ul>
+                </div>
+
+                <div class="mt-auto pt-3 border-top text-muted small">
+                  <strong>PNSDW 2017 Guidelines Reference:</strong>
+                  <ul class="mb-0 ps-3 mt-1">
+                    <li>pH 6.5 &ndash; 8.5 (safe range)</li>
+                    <li>Turbidity &le; 5.0 NTU</li>
+                    <li>Total Dissolved Solids &le; 600 mg/L</li>
+                    <li>10% caution margin triggers preventive alert</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+            <a href="{% url 'core:record_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary px-4 py-2 fw-semibold">
+              <i class="bi bi-check2-circle me-1"></i> {% if is_edit %}Update Test Record{% else %}Submit & Evaluate Water Test{% endif %}
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Live safety evaluation preview script
+  const phInput = document.getElementById('{{ form.ph_level.id_for_label }}');
+  const turbInput = document.getElementById('{{ form.turbidity_ntu.id_for_label }}');
+  const tdsInput = document.getElementById('{{ form.tds_ppm.id_for_label }}');
+
+  const badgeBox = document.getElementById('previewOverallBadge');
+  const phStatus = document.getElementById('previewPhStatus');
+  const turbStatus = document.getElementById('previewTurbidityStatus');
+  const tdsStatus = document.getElementById('previewTdsStatus');
+  const remarksBox = document.getElementById('previewRemarksBox');
+  const remarksList = document.getElementById('previewRemarksList');
+
+  function updatePreview() {
+    const ph = phInput.value;
+    const turb = turbInput.value;
+    const tds = tdsInput.value;
+
+    if (!ph || !turb || !tds) {
+      badgeBox.innerHTML = '<span class="status-badge badge-untested fs-6"><i class="bi bi-hourglass-split"></i> Enter Values</span>';
+      phStatus.textContent = '-';
+      turbStatus.textContent = '-';
+      tdsStatus.textContent = '-';
+      remarksBox.classList.add('d-none');
+      return;
+    }
+
+    const url = `{% url 'core:api_evaluate_preview' %}?ph=${encodeURIComponent(ph)}&turbidity=${encodeURIComponent(turb)}&tds=${encodeURIComponent(tds)}`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.overall_status === 'SAFE') {
+          badgeBox.innerHTML = '<span class="status-badge badge-safe fs-6"><i class="bi bi-check-circle-fill"></i> Safe</span>';
+          remarksBox.classList.add('d-none');
+        } else if (data.overall_status === 'CAUTION') {
+          badgeBox.innerHTML = '<span class="status-badge badge-caution fs-6"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>';
+          remarksBox.className = 'alert alert-warning py-2 px-3 small mb-0';
+          remarksBox.classList.remove('d-none');
+        } else if (data.overall_status === 'UNSAFE') {
+          badgeBox.innerHTML = '<span class="status-badge badge-unsafe fs-6"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>';
+          remarksBox.className = 'alert alert-danger py-2 px-3 small mb-0';
+          remarksBox.classList.remove('d-none');
+        }
+
+        if (data.parameters) {
+          phStatus.textContent = data.parameters.ph.status;
+          phStatus.className = 'fw-bold ' + (data.parameters.ph.status === 'SAFE' ? 'text-success' : (data.parameters.ph.status === 'CAUTION' ? 'text-warning' : 'text-danger'));
+
+          turbStatus.textContent = data.parameters.turbidity.status;
+          turbStatus.className = 'fw-bold ' + (data.parameters.turbidity.status === 'SAFE' ? 'text-success' : (data.parameters.turbidity.status === 'CAUTION' ? 'text-warning' : 'text-danger'));
+
+          tdsStatus.textContent = data.parameters.tds.status;
+          tdsStatus.className = 'fw-bold ' + (data.parameters.tds.status === 'SAFE' ? 'text-success' : (data.parameters.tds.status === 'CAUTION' ? 'text-warning' : 'text-danger'));
+        }
+
+        if (data.failed_parameters && data.failed_parameters.length > 0) {
+          remarksList.innerHTML = '';
+          data.failed_parameters.forEach(f => {
+            const li = document.createElement('li');
+            li.textContent = `${f.parameter_name}: ${f.reason}`;
+            remarksList.appendChild(li);
+          });
+          remarksBox.classList.remove('d-none');
+        } else {
+          remarksBox.classList.add('d-none');
+        }
+      })
+      .catch(err => console.error('Preview error:', err));
+  }
+
+  phInput.addEventListener('input', updatePreview);
+  turbInput.addEventListener('input', updatePreview);
+  tdsInput.addEventListener('input', updatePreview);
+
+  // Trigger preview on initial load if editing
+  window.addEventListener('DOMContentLoaded', updatePreview);
+</script>
+{% endblock %}

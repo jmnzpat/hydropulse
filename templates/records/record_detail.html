@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Test Result: {{ record.source.name }} ({{ record.tested_at|date:"M d, Y" }}) | HydroPulse{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{% url 'core:record_list' %}" class="text-decoration-none">Test Records</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ record.source.name }} ({{ record.tested_at|date:"Y-m-d" }})</li>
+  </ol>
+</nav>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h3 class="fw-bold text-dark mb-0">{{ record.source.name }}</h3>
+      {% if record.overall_status == 'SAFE' %}
+        <span class="status-badge badge-safe fs-6"><i class="bi bi-check-circle-fill"></i> Safe</span>
+      {% elif record.overall_status == 'CAUTION' %}
+        <span class="status-badge badge-caution fs-6"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>
+      {% elif record.overall_status == 'UNSAFE' %}
+        <span class="status-badge badge-unsafe fs-6"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>
+      {% endif %}
+
+      {% if record.is_deleted %}
+        <span class="badge bg-danger-subtle text-danger border"><i class="bi bi-trash me-1"></i> Soft-Deleted</span>
+      {% endif %}
+    </div>
+    <p class="text-muted small mb-0">
+      <i class="bi bi-geo-alt me-1"></i> Brgy. <strong>{{ record.source.barangay }}</strong> &bull; Sampled on <strong>{{ record.tested_at|date:"F d, Y @ H:i" }}</strong> by {{ record.tested_by.get_full_name|default:record.tested_by.username|default:"System" }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'core:source_detail' record.source.id %}" class="btn btn-outline-secondary">
+      <i class="bi bi-geo-alt me-1"></i> View Water Source
+    </a>
+    {% if not record.is_deleted and CAN_INPUT_RECORDS %}
+      <a href="{% url 'core:record_edit' record.id %}" class="btn btn-outline-primary">
+        <i class="bi bi-pencil me-1"></i> Edit Test Data
+      </a>
+      <form method="post" action="{% url 'core:record_delete' record.id %}" class="d-inline" onsubmit="return confirm('Soft-delete this test reading?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger">
+          <i class="bi bi-trash me-1"></i> Delete
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Failed Parameters Alert Box -->
+{% if record.failed_parameters %}
+  <div class="alert {% if record.overall_status == 'UNSAFE' %}alert-danger border-danger-subtle{% else %}alert-warning border-warning-subtle{% endif %} shadow-sm mb-4">
+    <h5 class="alert-heading fw-bold mb-2">
+      <i class="bi {% if record.overall_status == 'UNSAFE' %}bi-exclamation-triangle-fill{% else %}bi-exclamation-circle-fill{% endif %} me-2"></i>
+      Standard Discrepancy Findings ({% if record.overall_status == 'UNSAFE' %}Unsafe Violations{% else %}Caution Warnings{% endif %})
+    </h5>
+    <ul class="mb-0">
+      {% for f in record.failed_parameters %}
+        <li>
+          <strong>{{ f.parameter_name }}:</strong> {{ f.reason }}
+          <span class="badge {% if f.status == 'UNSAFE' %}bg-danger{% else %}bg-warning text-dark{% endif %} ms-2">{{ f.status }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<!-- Parameter Cards Grid -->
+<div class="row g-4 mb-4">
+  <!-- pH Level -->
+  <div class="col-md-4">
+    <div class="card hp-card h-100 p-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted fw-semibold">pH Level</span>
+        <span class="badge bg-light text-secondary border">PNSDW: 6.5 - 8.5</span>
+      </div>
+      <div class="display-6 fw-bold {% if eval_result.parameters.ph.status == 'UNSAFE' %}text-danger{% elif eval_result.parameters.ph.status == 'CAUTION' %}text-warning{% else %}text-success{% endif %} mb-1">
+        {{ record.ph_level }}
+      </div>
+      <div class="small text-muted mb-3">Measurement Unit: pH units</div>
+      <div class="progress mb-2" style="height: 10px;">
+        <!-- Relative bar: 0 to 14 -->
+        <div class="progress-bar {% if eval_result.parameters.ph.status == 'UNSAFE' %}bg-danger{% elif eval_result.parameters.ph.status == 'CAUTION' %}bg-warning{% else %}bg-success{% endif %}" 
+             role="progressbar" style="width: {{ record.ph_level|floatformat:1 }}0%;"></div>
+      </div>
+      <div class="d-flex justify-content-between small text-muted">
+        <span>0 (Acidic)</span>
+        <span class="fw-bold">7.0 (Neutral)</span>
+        <span>14 (Alkaline)</span>
+      </div>
+      <div class="small mt-3 border-top pt-2 text-secondary">
+        Status: <strong>{{ eval_result.parameters.ph.status }}</strong>
+        {% if eval_result.parameters.ph.reason %}<div class="text-danger small mt-1">{{ eval_result.parameters.ph.reason }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Turbidity -->
+  <div class="col-md-4">
+    <div class="card hp-card h-100 p-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted fw-semibold">Turbidity</span>
+        <span class="badge bg-light text-secondary border">PNSDW: &le; 5.0 NTU</span>
+      </div>
+      <div class="display-6 fw-bold {% if eval_result.parameters.turbidity.status == 'UNSAFE' %}text-danger{% elif eval_result.parameters.turbidity.status == 'CAUTION' %}text-warning{% else %}text-success{% endif %} mb-1">
+        {{ record.turbidity_ntu }} <span class="fs-5">NTU</span>
+      </div>
+      <div class="small text-muted mb-3">Nephelometric Turbidity Units</div>
+      <div class="progress mb-2" style="height: 10px;">
+        <div class="progress-bar {% if eval_result.parameters.turbidity.status == 'UNSAFE' %}bg-danger{% elif eval_result.parameters.turbidity.status == 'CAUTION' %}bg-warning{% else %}bg-success{% endif %}" 
+             role="progressbar" style="width: {% widthratio record.turbidity_ntu 10 100 %}%;"></div>
+      </div>
+      <div class="d-flex justify-content-between small text-muted">
+        <span>0 NTU (Clear)</span>
+        <span>5.0 NTU (Max Safe)</span>
+        <span>10+ NTU</span>
+      </div>
+      <div class="small mt-3 border-top pt-2 text-secondary">
+        Status: <strong>{{ eval_result.parameters.turbidity.status }}</strong>
+        {% if eval_result.parameters.turbidity.reason %}<div class="text-danger small mt-1">{{ eval_result.parameters.turbidity.reason }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Total Dissolved Solids -->
+  <div class="col-md-4">
+    <div class="card hp-card h-100 p-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted fw-semibold">Total Dissolved Solids</span>
+        <span class="badge bg-light text-secondary border">PNSDW: &le; 600 mg/L</span>
+      </div>
+      <div class="display-6 fw-bold {% if eval_result.parameters.tds.status == 'UNSAFE' %}text-danger{% elif eval_result.parameters.tds.status == 'CAUTION' %}text-warning{% else %}text-success{% endif %} mb-1">
+        {{ record.tds_ppm }} <span class="fs-5">mg/L</span>
+      </div>
+      <div class="small text-muted mb-3">Milligrams per liter (ppm)</div>
+      <div class="progress mb-2" style="height: 10px;">
+        <div class="progress-bar {% if eval_result.parameters.tds.status == 'UNSAFE' %}bg-danger{% elif eval_result.parameters.tds.status == 'CAUTION' %}bg-warning{% else %}bg-success{% endif %}" 
+             role="progressbar" style="width: {% widthratio record.tds_ppm 1000 100 %}%;"></div>
+      </div>
+      <div class="d-flex justify-content-between small text-muted">
+        <span>0 mg/L</span>
+        <span>600 mg/L (Max Safe)</span>
+        <span>1000+ mg/L</span>
+      </div>
+      <div class="small mt-3 border-top pt-2 text-secondary">
+        Status: <strong>{{ eval_result.parameters.tds.status }}</strong>
+        {% if eval_result.parameters.tds.reason %}<div class="text-danger small mt-1">{{ eval_result.parameters.tds.reason }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Field Notes & Alerts -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-chat-left-text text-primary me-2"></i> Field Technician Notes</h6>
+      </div>
+      <div class="card-body p-4">
+        {% if record.notes %}
+          <p class="text-dark mb-0" style="white-space: pre-wrap;">{{ record.notes }}</p>
+        {% else %}
+          <span class="text-muted fst-italic">No additional observations recorded for this test.</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-bell text-primary me-2"></i> Automated System Alerts Triggered</h6>
+      </div>
+      <div class="card-body p-4">
+        {% if associated_alerts %}
+          {% for a in associated_alerts %}
+            <div class="border rounded-3 p-3 mb-2 {% if a.severity == 'CRITICAL' %}border-danger bg-danger-subtle{% else %}border-warning bg-warning-subtle{% endif %}">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge {% if a.severity == 'CRITICAL' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                  {{ a.severity }} ALERT
+                </span>
+                <span class="badge bg-white text-dark border">{{ a.get_status_display }}</span>
+              </div>
+              <div class="small fw-semibold mt-1">{{ a.summary }}</div>
+              <div class="small text-muted mt-2">
+                Triggered: {{ a.created_at|date:"M d, Y H:i" }}
+                {% if a.acknowledged_by %} &bull; Acknowledged by {{ a.acknowledged_by.username }}{% endif %}
+                {% if a.resolved_by %} &bull; Resolved by {{ a.resolved_by.username }}{% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-shield-check display-6 d-block mb-2 text-success"></i>
+            No contamination alerts triggered. Parameters meet safety standards.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

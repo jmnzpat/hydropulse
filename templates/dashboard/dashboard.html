@@ -1,0 +1,660 @@
+{% extends 'base.html' %}
+
+{% block title %}Surveillance Dashboard & Analytics | HydroPulse{% endblock %}
+
+{% block extra_css %}
+<style>
+  .metric-card {
+    border-radius: 12px;
+    border: 1px solid var(--hp-border);
+    background: #ffffff;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--hp-shadow-md);
+  }
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: 100%;
+  }
+  .metric-safe::before { background-color: var(--hp-safe); }
+  .metric-caution::before { background-color: var(--hp-caution); }
+  .metric-unsafe::before { background-color: var(--hp-unsafe); }
+  .metric-primary::before { background-color: var(--hp-primary); }
+
+  .chart-container-box {
+    position: relative;
+    height: 280px;
+    width: 100%;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header & Filters -->
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h3 class="fw-bold mb-0 text-dark">
+        <i class="bi bi-speedometer2 text-primary me-2"></i> Water Surveillance Dashboard
+      </h3>
+      <span class="badge px-3 py-1 rounded-pill 
+        {% if user.is_admin %}badge-role-admin
+        {% elif user.is_health_officer %}badge-role-health
+        {% elif user.is_sanitation_engineer %}badge-role-engineer
+        {% else %}badge-role-resident{% endif %}">
+        {{ user.get_role_display }}
+      </span>
+    </div>
+    <p class="text-muted mb-0 small">
+      Real-time drinking water safety surveillance across communal wells, tap stands, and refilling stations.
+    </p>
+  </div>
+
+  <!-- Barangay Filter & Quick Action -->
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="barangay" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 180px;">
+        <option value="">-- All Barangays (Municipality) --</option>
+        {% for b in distinct_barangays %}
+          <option value="{{ b }}" {% if selected_barangay == b %}selected{% endif %}>Brgy. {{ b }}</option>
+        {% endfor %}
+      </select>
+      {% if selected_barangay %}
+        <a href="{% url 'core:dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Clear filter">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      {% endif %}
+    </form>
+
+    <button onclick="window.print()" class="btn btn-outline-secondary btn-sm no-print">
+      <i class="bi bi-printer me-1"></i> Print Summary
+    </button>
+
+    {% if CAN_INPUT_RECORDS %}
+      <a href="{% url 'core:record_create' %}" class="btn btn-primary btn-sm shadow-sm">
+        <i class="bi bi-plus-circle me-1"></i> Encode New Test
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPI Cards Row -->
+<div class="row g-3 mb-4">
+  <!-- Monitored Sources -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="metric-card metric-primary">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <span class="text-muted small fw-semibold">Monitored Sources</span>
+          <div class="fs-3 fw-bold text-dark mt-1">{{ metrics.total_sources }}</div>
+        </div>
+        <div class="hp-stat-icon bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-geo-alt-fill"></i>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        <span class="text-success fw-semibold">{{ metrics.active_sources }} active</span> &bull; {{ metrics.inactive_sources }} suspended
+      </div>
+    </div>
+  </div>
+
+  <!-- Safe Potable Sources -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="metric-card metric-safe">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <span class="text-muted small fw-semibold">Safe (Potable) Sources</span>
+          <div class="fs-3 fw-bold text-success mt-1">{{ metrics.safe_sources_count }}</div>
+        </div>
+        <div class="hp-stat-icon bg-success bg-opacity-10 text-success">
+          <i class="bi bi-check-circle-fill"></i>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        <strong>{{ metrics.compliance_rate }}%</strong> municipal safety compliance rate
+      </div>
+    </div>
+  </div>
+
+  <!-- Caution Sources -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="metric-card metric-caution">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <span class="text-muted small fw-semibold">Caution (Approaching Limits)</span>
+          <div class="fs-3 fw-bold text-warning mt-1">{{ metrics.caution_sources_count }}</div>
+        </div>
+        <div class="hp-stat-icon bg-warning bg-opacity-10 text-warning">
+          <i class="bi bi-exclamation-circle-fill"></i>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        Within 10% safety margin &bull; Early alert
+      </div>
+    </div>
+  </div>
+
+  <!-- Unsafe Contaminated Sources -->
+  <div class="col-sm-6 col-lg-3">
+    <div class="metric-card metric-unsafe">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <span class="text-muted small fw-semibold">Unsafe (Contaminated)</span>
+          <div class="fs-3 fw-bold text-danger mt-1">{{ metrics.unsafe_sources_count }}</div>
+        </div>
+        <div class="hp-stat-icon bg-danger bg-opacity-10 text-danger">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">
+        <span class="text-danger fw-semibold">{{ metrics.active_alerts_total }} active alerts</span> requiring response
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recurring Issues & Contamination Highlights (Academic Innovation) -->
+{% if recurring_issues %}
+  <div class="card border-warning shadow-sm mb-4">
+    <div class="card-header bg-warning bg-opacity-10 py-3 border-warning d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-shield-exclamation text-warning fs-4 me-2"></i>
+        <div>
+          <h6 class="fw-bold mb-0 text-dark">Recurring Water Quality Issue Highlights</h6>
+          <span class="small text-muted">Automated surveillance detected repeated threshold breaches in recent testing cycles.</span>
+        </div>
+      </div>
+      <span class="badge bg-warning text-dark">{{ recurring_issues|length }} Identified Source(s)</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Water Source</th>
+              <th>Barangay</th>
+              <th>Frequency</th>
+              <th>Detected Instability</th>
+              <th>Recommended Intervention</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for issue in recurring_issues %}
+              <tr>
+                <td>
+                  <a href="{% url 'core:source_detail' issue.source.id %}" class="fw-bold text-dark text-decoration-none">
+                    {{ issue.source.name }}
+                  </a>
+                  <div class="small text-muted font-monospace">{{ issue.source.code }}</div>
+                </td>
+                <td>{{ issue.source.barangay }}</td>
+                <td>
+                  <span class="badge {% if issue.severity == 'CRITICAL' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                    Failed {{ issue.fail_count }} of last {{ issue.window }} tests
+                  </span>
+                </td>
+                <td class="small fw-semibold text-danger">
+                  {{ issue.primary_issues }}
+                </td>
+                <td class="small text-muted" style="max-width: 320px;">
+                  <i class="bi bi-wrench me-1 text-primary"></i> {{ issue.recommended_action }}
+                </td>
+                <td class="text-end">
+                  {% if CAN_INPUT_RECORDS %}
+                    <a href="{% url 'core:record_create' %}?source={{ issue.source.id }}" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-arrow-repeat me-1"></i> Re-test
+                    </a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Charts Section -->
+<div class="row g-4 mb-4">
+  <!-- Parameter Trends Timeline Chart -->
+  <div class="col-lg-8">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-graph-up text-primary me-2"></i> Chronological Parameter Trends</h6>
+          <span class="small text-muted">Historical measurements against PNSDW 2017 thresholds</span>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" id="parameterToggleGroup">
+          <button type="button" class="btn btn-outline-primary active" onclick="switchParameterChart('all', this)">All</button>
+          <button type="button" class="btn btn-outline-primary" onclick="switchParameterChart('ph', this)">pH</button>
+          <button type="button" class="btn btn-outline-primary" onclick="switchParameterChart('turbidity', this)">Turbidity</button>
+          <button type="button" class="btn btn-outline-primary" onclick="switchParameterChart('tds', this)">TDS</button>
+        </div>
+      </div>
+      <div class="card-body p-3">
+        {% if parameter_timeline.labels %}
+          <div class="chart-container-box">
+            <canvas id="timelineChart"></canvas>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-bar-chart display-6 d-block mb-2"></i>
+            No water test records available to plot trends.
+          </div>
+        {% endif %}
+      </div>
+      <div class="card-footer bg-white border-top py-2 px-3 d-flex flex-wrap justify-content-between small text-muted">
+        <span><i class="bi bi-info-circle me-1"></i> Standard Limits: pH (6.5&ndash;8.5), Turbidity (&le;5 NTU), TDS (&le;600 mg/L)</span>
+        <span class="fw-semibold">Showing last {{ parameter_timeline.labels|length }} tests</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Safety Distribution Doughnut Chart -->
+  <div class="col-lg-4">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-pie-chart text-primary me-2"></i> Current Safety Status Distribution</h6>
+        <span class="small text-muted">Proportion of safe vs contaminated sources</span>
+      </div>
+      <div class="card-body p-3 d-flex flex-column justify-content-center align-items-center">
+        {% if metrics.tested_sources_total > 0 %}
+          <div style="height: 220px; width: 100%; position: relative;">
+            <canvas id="distributionChart"></canvas>
+          </div>
+          <div class="w-100 mt-3 pt-2 border-top">
+            <div class="d-flex justify-content-between small py-1">
+              <span><i class="bi bi-circle-fill text-success me-1"></i> Safe (Potable)</span>
+              <strong>{{ metrics.safe_sources_count }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small py-1">
+              <span><i class="bi bi-circle-fill text-warning me-1"></i> Caution (Margin)</span>
+              <strong>{{ metrics.caution_sources_count }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small py-1">
+              <span><i class="bi bi-circle-fill text-danger me-1"></i> Unsafe (Exceeded)</span>
+              <strong>{{ metrics.unsafe_sources_count }}</strong>
+            </div>
+            <div class="d-flex justify-content-between small py-1">
+              <span><i class="bi bi-circle-fill text-secondary me-1"></i> Untested</span>
+              <strong>{{ metrics.untested_sources_count }}</strong>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-pie-chart display-6 d-block mb-2"></i>
+            No water sources tested yet.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Secondary Row: Barangay Compliance & Recent Alerts -->
+<div class="row g-4 mb-4">
+  <!-- Barangay Compliance Bar Chart -->
+  <div class="col-lg-7">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-bar-chart-fill text-primary me-2"></i> Water Safety Compliance by Barangay</h6>
+        <span class="small text-muted">Safe vs Caution/Unsafe test outcomes across villages</span>
+      </div>
+      <div class="card-body p-3">
+        {% if barangay_compliance.labels %}
+          <div class="chart-container-box">
+            <canvas id="barangayComplianceChart"></canvas>
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-bar-chart display-6 d-block mb-2"></i>
+            No barangay data available.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Alerts & Field Notices -->
+  <div class="col-lg-5">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-bell-fill text-danger me-2"></i> Recent Contamination Alerts</h6>
+          <span class="small text-muted">Triggered by non-compliant water test results</span>
+        </div>
+        <a href="{% url 'core:alert_list' %}" class="btn btn-outline-danger btn-sm">View All</a>
+      </div>
+      <div class="card-body p-3">
+        {% if recent_alerts %}
+          <div class="list-group list-group-flush">
+            {% for a in recent_alerts %}
+              <div class="list-group-item px-0 py-2 border-bottom">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="badge {% if a.severity == 'CRITICAL' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                    {{ a.severity }}
+                  </span>
+                  <span class="badge bg-light text-dark border">{{ a.get_status_display }}</span>
+                </div>
+                <div class="fw-semibold small text-dark">{{ a.source.name }} (Brgy. {{ a.source.barangay }})</div>
+                <div class="text-muted small text-truncate">{{ a.summary }}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">{{ a.created_at|timesince }} ago</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-shield-check display-6 d-block mb-2 text-success"></i>
+            No unacknowledged contamination alerts. All monitored sources compliant.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monitored Sources Real-Time Matrix Table -->
+<div class="card hp-card mb-4">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i> Monitored Sources Surveillance Matrix</h5>
+      <span class="small text-muted">Latest laboratory readings and operating status per communal source</span>
+    </div>
+    <a href="{% url 'core:source_list' %}" class="btn btn-outline-secondary btn-sm">Full Directory</a>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Source Name & Code</th>
+          <th>Type</th>
+          <th>Barangay</th>
+          <th>Current Status</th>
+          <th>Latest Test Date</th>
+          <th>pH Level</th>
+          <th>Turbidity</th>
+          <th>TDS (mg/L)</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sources_matrix %}
+          {% with lr=s.latest_record %}
+            <tr>
+              <td>
+                <a href="{% url 'core:source_detail' s.id %}" class="fw-bold text-dark text-decoration-none">
+                  {{ s.name }}
+                </a>
+                <div class="small text-muted font-monospace">{{ s.code }}</div>
+              </td>
+              <td><span class="badge bg-light text-dark border">{{ s.get_source_type_display }}</span></td>
+              <td>{{ s.barangay }}</td>
+              <td>
+                {% if s.current_status == 'SAFE' %}
+                  <span class="status-badge badge-safe"><i class="bi bi-check-circle-fill"></i> Safe</span>
+                {% elif s.current_status == 'CAUTION' %}
+                  <span class="status-badge badge-caution"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>
+                {% elif s.current_status == 'UNSAFE' %}
+                  <span class="status-badge badge-unsafe"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>
+                {% else %}
+                  <span class="status-badge badge-untested"><i class="bi bi-question-circle"></i> Untested</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if lr %}
+                  <div class="small fw-semibold">{{ lr.tested_at|date:"M d, Y" }}</div>
+                  <div class="text-muted" style="font-size: 0.75rem;">{{ lr.tested_at|timesince }} ago</div>
+                {% else %}
+                  <span class="text-muted small fst-italic">Never tested</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if lr %}
+                  <span class="{% if lr.ph_level < 6.5 or lr.ph_level > 8.5 %}text-danger fw-bold{% elif lr.ph_level <= 6.7 or lr.ph_level >= 8.3 %}text-warning fw-semibold{% endif %}">
+                    {{ lr.ph_level }}
+                  </span>
+                {% else %}-{% endif %}
+              </td>
+              <td>
+                {% if lr %}
+                  <span class="{% if lr.turbidity_ntu > 5.0 %}text-danger fw-bold{% elif lr.turbidity_ntu >= 4.5 %}text-warning fw-semibold{% endif %}">
+                    {{ lr.turbidity_ntu }} NTU
+                  </span>
+                {% else %}-{% endif %}
+              </td>
+              <td>
+                {% if lr %}
+                  <span class="{% if lr.tds_ppm > 600.0 %}text-danger fw-bold{% elif lr.tds_ppm >= 540.0 %}text-warning fw-semibold{% endif %}">
+                    {{ lr.tds_ppm }}
+                  </span>
+                {% else %}-{% endif %}
+              </td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  <a href="{% url 'core:source_detail' s.id %}" class="btn btn-outline-secondary" title="View Details">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  {% if CAN_INPUT_RECORDS %}
+                    <a href="{% url 'core:record_create' %}?source={{ s.id }}" class="btn btn-outline-primary" title="Record Test">
+                      <i class="bi bi-plus-lg"></i>
+                    </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endwith %}
+        {% empty %}
+          <tr>
+            <td colspan="9" class="text-center py-4 text-muted">
+              No water sources registered in this barangay.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // 1. Safety Distribution Doughnut Chart
+  {% if metrics.tested_sources_total > 0 %}
+    const distCtx = document.getElementById('distributionChart').getContext('2d');
+    const distChart = new Chart(distCtx, {
+      type: 'doughnut',
+      data: {
+        labels: {{ safety_distribution.labels|safe }},
+        datasets: [{
+          data: {{ safety_distribution.counts|safe }},
+          backgroundColor: {{ safety_distribution.colors|safe }},
+          borderWidth: 2,
+          borderColor: '#ffffff',
+          hoverOffset: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                const value = context.raw;
+                const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                return ` ${context.label}: ${value} source(s) (${percentage}%)`;
+              }
+            }
+          }
+        },
+        cutout: '70%'
+      }
+    });
+  {% endif %}
+
+  // 2. Timeline Parameter Trends Line Chart
+  {% if parameter_timeline.labels %}
+    const timelineLabels = {{ parameter_timeline.labels|safe }};
+    const phData = {{ parameter_timeline.ph_data|safe }};
+    const turbData = {{ parameter_timeline.turbidity_data|safe }};
+    const tdsData = {{ parameter_timeline.tds_data|safe }};
+
+    const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+    let timelineChart = new Chart(timelineCtx, {
+      type: 'line',
+      data: {
+        labels: timelineLabels,
+        datasets: [
+          {
+            label: 'pH Level (Safe: 6.5 - 8.5)',
+            data: phData,
+            borderColor: '#0284c7',
+            backgroundColor: 'rgba(2, 132, 199, 0.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#0284c7',
+            yAxisID: 'yPh',
+            tension: 0.3
+          },
+          {
+            label: 'Turbidity NTU (Max: 5.0)',
+            data: turbData,
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#f59e0b',
+            yAxisID: 'yTurb',
+            tension: 0.3
+          },
+          {
+            label: 'TDS mg/L (Max: 600)',
+            data: tdsData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#10b981',
+            yAxisID: 'yTds',
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        scales: {
+          yPh: {
+            type: 'linear',
+            position: 'left',
+            min: 5.5,
+            max: 9.5,
+            title: { display: true, text: 'pH (units)', color: '#0284c7' }
+          },
+          yTurb: {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            max: 12,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Turbidity (NTU)', color: '#f59e0b' }
+          },
+          yTds: {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            max: 800,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'TDS (mg/L)', color: '#10b981' }
+          }
+        }
+      }
+    });
+
+    function switchParameterChart(param, btnElement) {
+      document.querySelectorAll('#parameterToggleGroup button').forEach(b => b.classList.remove('active'));
+      btnElement.classList.add('active');
+
+      if (param === 'all') {
+        timelineChart.data.datasets[0].hidden = false;
+        timelineChart.data.datasets[1].hidden = false;
+        timelineChart.data.datasets[2].hidden = false;
+      } else if (param === 'ph') {
+        timelineChart.data.datasets[0].hidden = false;
+        timelineChart.data.datasets[1].hidden = true;
+        timelineChart.data.datasets[2].hidden = true;
+      } else if (param === 'turbidity') {
+        timelineChart.data.datasets[0].hidden = true;
+        timelineChart.data.datasets[1].hidden = false;
+        timelineChart.data.datasets[2].hidden = true;
+      } else if (param === 'tds') {
+        timelineChart.data.datasets[0].hidden = true;
+        timelineChart.data.datasets[1].hidden = true;
+        timelineChart.data.datasets[2].hidden = false;
+      }
+      timelineChart.update();
+    }
+  {% endif %}
+
+  // 3. Barangay Compliance Comparison Bar Chart
+  {% if barangay_compliance.labels %}
+    const barCtx = document.getElementById('barangayComplianceChart').getContext('2d');
+    new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: {{ barangay_compliance.labels|safe }},
+        datasets: [
+          {
+            label: 'Safe Tests',
+            data: {{ barangay_compliance.safe_counts|safe }},
+            backgroundColor: '#059669',
+            borderRadius: 6
+          },
+          {
+            label: 'Caution Tests',
+            data: {{ barangay_compliance.caution_counts|safe }},
+            backgroundColor: '#d97706',
+            borderRadius: 6
+          },
+          {
+            label: 'Unsafe Tests',
+            data: {{ barangay_compliance.unsafe_counts|safe }},
+            backgroundColor: '#dc2626',
+            borderRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top' }
+        },
+        scales: {
+          x: { stacked: false },
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+  {% endif %}
+</script>
+{% endblock %}

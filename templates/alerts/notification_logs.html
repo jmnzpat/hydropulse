@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}Notification Transmission Logs | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-journal-text text-secondary me-2"></i>Notification Transmission Logs</h3>
+    <p class="text-muted small mb-0">Audit trail of all email and SMS alert dispatches — including simulated (mocked) deliveries.</p>
+  </div>
+  <a href="{% url 'core:notification_recipients' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-people me-1"></i> Manage Recipients
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="card hp-card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="row g-2 align-items-end" id="log-filter-form">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Search</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="Recipient name, destination…" class="form-control form-control-sm" id="log-search-input">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-muted mb-1">Channel</label>
+        <select name="channel" class="form-select form-select-sm" id="log-channel-filter">
+          <option value="">All Channels</option>
+          <option value="EMAIL" {% if channel_filter == 'EMAIL' %}selected{% endif %}>Email</option>
+          <option value="SMS" {% if channel_filter == 'SMS' %}selected{% endif %}>SMS</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-muted mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm" id="log-status-filter">
+          <option value="">All Statuses</option>
+          <option value="SENT"   {% if status_filter == 'SENT'   %}selected{% endif %}>Sent</option>
+          <option value="MOCKED" {% if status_filter == 'MOCKED' %}selected{% endif %}>Mocked (Simulated)</option>
+          <option value="FAILED" {% if status_filter == 'FAILED' %}selected{% endif %}>Failed</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" id="log-filter-btn"><i class="bi bi-funnel me-1"></i> Filter</button>
+        <a href="?" class="btn btn-outline-secondary btn-sm">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Log Table -->
+<div class="card hp-card">
+  <div class="card-body p-0">
+    {% if page_obj %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle small">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Sent At</th>
+              <th>Recipient</th>
+              <th>Channel</th>
+              <th>Destination</th>
+              <th>Status</th>
+              <th>Related Alert</th>
+              <th class="pe-3">Message Preview</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in page_obj %}
+              <tr>
+                <td class="ps-3 text-nowrap">{{ log.sent_at|date:"M d, Y" }}<br><span class="text-muted" style="font-size:.7rem">{{ log.sent_at|date:"H:i:s" }}</span></td>
+                <td class="fw-semibold">{{ log.recipient_name }}</td>
+                <td>
+                  {% if log.channel == 'EMAIL' %}
+                    <span class="badge bg-primary">Email</span>
+                  {% else %}
+                    <span class="badge bg-info text-dark">SMS</span>
+                  {% endif %}
+                </td>
+                <td class="text-muted" style="font-size:.75rem">{{ log.destination }}</td>
+                <td>
+                  {% if log.status == 'SENT' %}
+                    <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Sent</span>
+                  {% elif log.status == 'MOCKED' %}
+                    <span class="badge bg-secondary"><i class="bi bi-cpu me-1"></i>Mocked</span>
+                  {% else %}
+                    <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Failed</span>
+                  {% endif %}
+                  {% if log.error_message %}
+                    <div class="text-danger" style="font-size:.65rem" title="{{ log.error_message }}">
+                      <i class="bi bi-exclamation-triangle me-1"></i>{{ log.error_message|truncatechars:40 }}
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if log.alert %}
+                    <a href="{% url 'core:alert_detail' log.alert.id %}" class="text-decoration-none small">
+                      Alert #{{ log.alert.id }}
+                    </a>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="pe-3">
+                  <button class="btn btn-xs btn-outline-secondary btn-sm" type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#msg-{{ log.id }}"
+                          style="font-size:.7rem">
+                    <i class="bi bi-chat-text"></i> Preview
+                  </button>
+                  <div class="collapse mt-2" id="msg-{{ log.id }}">
+                    <pre class="bg-light p-2 rounded small mb-0" style="max-height:150px;overflow:auto;font-size:.7rem;white-space:pre-wrap">{{ log.message_content }}</pre>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-center py-3">
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&q={{ query }}">&laquo;</a></li>
+              {% endif %}
+              <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&channel={{ channel_filter }}&status={{ status_filter }}&q={{ query }}">&raquo;</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-journal display-4 d-block mb-3 opacity-50"></i>
+        <p class="fw-semibold">No notification logs found.</p>
+        <p class="small">Logs are created automatically whenever an alert is dispatched — either in simulation or production mode.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

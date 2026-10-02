@@ -1,0 +1,355 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ source.name }} | Water Source Details | HydroPulse{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS for Map -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  #sourceMap {
+    height: 220px;
+    width: 100%;
+    border-radius: 8px;
+    z-index: 1;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="{% url 'core:source_list' %}" class="text-decoration-none">Water Sources</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ source.name }}</li>
+  </ol>
+</nav>
+
+<!-- Header & Quick Actions -->
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <h3 class="fw-bold text-dark mb-0">{{ source.name }}</h3>
+      <span class="badge bg-secondary-subtle text-secondary font-monospace">{{ source.code }}</span>
+      {% if source.is_active %}
+        <span class="badge bg-success-subtle text-success border border-success-subtle">Active Monitoring</span>
+      {% else %}
+        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inactive</span>
+      {% endif %}
+    </div>
+    <p class="text-muted small mb-0">
+      <i class="bi bi-geo-alt me-1"></i> Brgy. <strong>{{ source.barangay }}</strong> &bull; {{ source.address_details|default:"No exact address specified" }}
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if CAN_INPUT_RECORDS %}
+      <a href="{% url 'core:record_create' %}?source={{ source.id }}" class="btn btn-primary shadow-sm">
+        <i class="bi bi-plus-circle me-1"></i> Encode New Test
+      </a>
+    {% endif %}
+    {% if CAN_MANAGE_SOURCES %}
+      <a href="{% url 'core:source_edit' source.id %}" class="btn btn-outline-secondary">
+        <i class="bi bi-pencil me-1"></i> Edit Source
+      </a>
+      <form method="post" action="{% url 'core:source_toggle_status' source.id %}" class="d-inline" onsubmit="return confirm('Toggle active sampling status for this source?');">
+        {% csrf_token %}
+        <button type="submit" class="btn {% if source.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+          {% if source.is_active %}<i class="bi bi-pause-circle me-1"></i> Suspend Sampling{% else %}<i class="bi bi-play-circle me-1"></i> Activate Sampling{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Overview Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="hp-card p-3 h-100">
+      <div class="text-muted small fw-semibold">Current Water Safety</div>
+      <div class="mt-2">
+        {% if source.current_status == 'SAFE' %}
+          <span class="status-badge badge-safe fs-6"><i class="bi bi-check-circle-fill"></i> Safe</span>
+        {% elif source.current_status == 'CAUTION' %}
+          <span class="status-badge badge-caution fs-6"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>
+        {% elif source.current_status == 'UNSAFE' %}
+          <span class="status-badge badge-unsafe fs-6"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>
+        {% else %}
+          <span class="status-badge badge-untested fs-6"><i class="bi bi-question-circle"></i> Untested</span>
+        {% endif %}
+      </div>
+      <div class="small text-muted mt-2">
+        {% if source.latest_record %}
+          Last tested: <strong>{{ source.latest_record.tested_at|date:"M d, Y" }}</strong>
+        {% else %}
+          No laboratory test recorded yet.
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="hp-card p-3 h-100">
+      <div class="text-muted small fw-semibold">Source Type & Infrastructure</div>
+      <div class="fw-bold text-dark fs-5 mt-1">{{ source.get_source_type_display }}</div>
+      <div class="small text-muted mt-2">
+        Assigned: <strong>{{ source.assigned_engineer.get_full_name|default:source.assigned_engineer.username|default:"Unassigned" }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="hp-card p-3 h-100">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="text-muted small fw-semibold">Sampling Compliance Summary</span>
+        <span class="badge bg-primary-subtle text-primary">{{ total_tests_count }} Total Tests</span>
+      </div>
+      <div class="d-flex gap-4 mt-2">
+        <div>
+          <span class="text-success fw-bold fs-4">{{ safe_tests_count }}</span>
+          <div class="small text-muted">Safe (Passed)</div>
+        </div>
+        <div>
+          <span class="text-warning fw-bold fs-4">{{ caution_tests_count }}</span>
+          <div class="small text-muted">Caution Level</div>
+        </div>
+        <div>
+          <span class="text-danger fw-bold fs-4">{{ unsafe_tests_count }}</span>
+          <div class="small text-muted">Unsafe (Failed)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Interactive Trend Chart -->
+  <div class="col-lg-8">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-graph-up text-primary me-2"></i> Parameter Quality Trends (Last 10 Tests)</h6>
+        <span class="small text-muted">pH, Turbidity, and TDS</span>
+      </div>
+      <div class="card-body p-3">
+        {% if chart_dates %}
+          <canvas id="sourceTrendsChart" style="max-height: 250px; width: 100%;"></canvas>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-bar-chart display-6 d-block mb-2"></i>
+            No test data available to generate trends chart.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Map / GPS -->
+  <div class="col-lg-4">
+    <div class="card hp-card h-100">
+      <div class="card-header bg-white py-3 border-bottom">
+        <h6 class="fw-bold mb-0 text-dark"><i class="bi bi-map text-primary me-2"></i> Geographic Location</h6>
+      </div>
+      <div class="card-body p-3">
+        {% if source.latitude and source.longitude %}
+          <div id="sourceMap"></div>
+          <div class="small text-muted mt-2 text-center font-monospace">
+            Coordinates: {{ source.latitude }}, {{ source.longitude }}
+          </div>
+        {% else %}
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-pin-map display-6 d-block mb-2 text-secondary"></i>
+            GPS coordinates not configured.
+            {% if CAN_MANAGE_SOURCES %}
+              <div class="mt-2"><a href="{% url 'core:source_edit' source.id %}" class="btn btn-sm btn-outline-primary">Add GPS Coordinates</a></div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Test Records Table -->
+<div class="card hp-card mb-4">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clipboard2-pulse text-primary me-2"></i> Historical Water Quality Records</h5>
+    {% if CAN_INPUT_RECORDS %}
+      <a href="{% url 'core:record_create' %}?source={{ source.id }}" class="btn btn-sm btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> Add Test
+      </a>
+    {% endif %}
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Tested Date / Time</th>
+          <th>pH Level</th>
+          <th>Turbidity (NTU)</th>
+          <th>TDS (mg/L)</th>
+          <th>Overall Status</th>
+          <th>Tested By</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records_page %}
+          <tr>
+            <td>
+              <a href="{% url 'core:record_detail' r.id %}" class="fw-bold text-dark text-decoration-none">
+                {{ r.tested_at|date:"M d, Y" }}
+              </a>
+              <div class="small text-muted">{{ r.tested_at|date:"H:i" }}</div>
+            </td>
+            <td>
+              <span class="fw-semibold {% if r.ph_level < 6.5 or r.ph_level > 8.5 %}text-danger{% endif %}">{{ r.ph_level }}</span>
+            </td>
+            <td>
+              <span class="fw-semibold {% if r.turbidity_ntu > 5.0 %}text-danger{% elif r.turbidity_ntu >= 4.5 %}text-warning{% endif %}">{{ r.turbidity_ntu }} NTU</span>
+            </td>
+            <td>
+              <span class="fw-semibold {% if r.tds_ppm > 600.0 %}text-danger{% elif r.tds_ppm >= 540.0 %}text-warning{% endif %}">{{ r.tds_ppm }} mg/L</span>
+            </td>
+            <td>
+              {% if r.overall_status == 'SAFE' %}
+                <span class="status-badge badge-safe"><i class="bi bi-check-circle-fill"></i> Safe</span>
+              {% elif r.overall_status == 'CAUTION' %}
+                <span class="status-badge badge-caution"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>
+              {% elif r.overall_status == 'UNSAFE' %}
+                <span class="status-badge badge-unsafe"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="small text-muted">{{ r.tested_by.get_full_name|default:r.tested_by.username|default:"System" }}</span>
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <a href="{% url 'core:record_detail' r.id %}" class="btn btn-outline-secondary" title="View Full Report">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if CAN_INPUT_RECORDS %}
+                  <a href="{% url 'core:record_edit' r.id %}" class="btn btn-outline-secondary" title="Edit Record">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="post" action="{% url 'core:record_delete' r.id %}" class="d-inline" onsubmit="return confirm('Soft-delete this test record?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger" title="Move to Trash">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-muted">
+              <i class="bi bi-clipboard-x display-6 d-block mb-2"></i>
+              No test records found for this water source yet.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if records_page.has_other_pages %}
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+      <span class="small text-muted">Page {{ records_page.number }} of {{ records_page.paginator.num_pages }}</span>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if records_page.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ records_page.previous_page_number }}">Previous</a></li>
+          {% endif %}
+          <li class="page-item active"><span class="page-link">{{ records_page.number }}</span></li>
+          {% if records_page.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ records_page.next_page_number }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS for Map -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  {% if source.latitude and source.longitude %}
+    const lat = {{ source.latitude }};
+    const lng = {{ source.longitude }};
+    const map = L.map('sourceMap').setView([lat, lng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map)
+      .bindPopup('<strong>{{ source.name|escapejs }}</strong><br>{{ source.barangay|escapejs }}')
+      .openPopup();
+  {% endif %}
+
+  {% if chart_dates %}
+    const ctx = document.getElementById('sourceTrendsChart');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: {{ chart_dates|safe }},
+        datasets: [
+          {
+            label: 'pH Level (6.5 - 8.5)',
+            data: {{ chart_ph|safe }},
+            borderColor: '#0284c7',
+            backgroundColor: 'rgba(2, 132, 199, 0.1)',
+            yAxisID: 'yPh',
+            tension: 0.3
+          },
+          {
+            label: 'Turbidity NTU (Max 5.0)',
+            data: {{ chart_turbidity|safe }},
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+            yAxisID: 'yTurb',
+            tension: 0.3
+          },
+          {
+            label: 'TDS mg/L (Max 600)',
+            data: {{ chart_tds|safe }},
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            yAxisID: 'yTds',
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          yPh: {
+            type: 'linear',
+            position: 'left',
+            min: 5.0,
+            max: 10.0,
+            title: { display: true, text: 'pH' }
+          },
+          yTurb: {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            max: 12,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Turbidity (NTU)' }
+          },
+          yTds: {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            max: 800,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'TDS (mg/L)' }
+          }
+        }
+      }
+    });
+  {% endif %}
+</script>
+{% endblock %}

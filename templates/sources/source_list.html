@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+
+{% block title %}Water Sources Directory | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-geo-alt-fill text-primary me-2"></i> Communal Water Sources</h3>
+    <p class="text-muted mb-0 small">Directory of monitored communal deep wells, tap stands, natural springs, and refilling stations.</p>
+  </div>
+  {% if CAN_MANAGE_SOURCES %}
+    <div>
+      <a href="{% url 'core:source_create' %}" class="btn btn-primary shadow-sm">
+        <i class="bi bi-plus-circle me-1"></i> Register New Water Source
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Search & Filters -->
+<div class="card hp-card mb-4">
+  <div class="card-body p-3">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-md-4">
+        <div class="input-group">
+          <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="Search by name, code, location...">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <select name="type" class="form-select">
+          <option value="">-- All Source Types --</option>
+          {% for t_code, t_label in source_types %}
+            <option value="{{ t_code }}" {% if selected_type == t_code %}selected{% endif %}>{{ t_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="barangay" class="form-select">
+          <option value="">-- All Barangays --</option>
+          {% for b in distinct_barangays %}
+            <option value="{{ b }}" {% if selected_barangay == b %}selected{% endif %}>{{ b }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-secondary w-100">Filter</button>
+      </div>
+      {% if query or selected_type or selected_barangay or selected_status %}
+        <div class="col-12 mt-2">
+          <a href="{% url 'core:source_list' %}" class="small text-decoration-none text-muted"><i class="bi bi-x-circle me-1"></i> Reset Filters</a>
+        </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Sources Table -->
+<div class="card hp-card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Source Name & Code</th>
+          <th>Source Type</th>
+          <th>Barangay / Location</th>
+          <th>Assigned Engineer</th>
+          <th>Latest Safety Status</th>
+          <th>Sampling Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in page_obj %}
+          <tr>
+            <td>
+              <div>
+                <a href="{% url 'core:source_detail' s.id %}" class="fw-bold text-dark text-decoration-none hover-primary">
+                  {{ s.name }}
+                </a>
+                <div class="small text-muted font-monospace">{{ s.code }}</div>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">
+                {% if s.source_type == 'DEEP_WELL' %}<i class="bi bi-water text-primary me-1"></i> Deep Well
+                {% elif s.source_type == 'SHALLOW_WELL' %}<i class="bi bi-moisture text-info me-1"></i> Shallow Well
+                {% elif s.source_type == 'SPRING' %}<i class="bi bi-tsunami text-success me-1"></i> Natural Spring
+                {% elif s.source_type == 'COMMUNAL_TAP' %}<i class="bi bi-droplet text-primary me-1"></i> Communal Tap
+                {% elif s.source_type == 'REFILLING_STATION' %}<i class="bi bi-shop text-warning me-1"></i> Refilling Station
+                {% else %}{{ s.get_source_type_display }}{% endif %}
+              </span>
+            </td>
+            <td>
+              <div class="fw-semibold text-secondary">{{ s.barangay }}</div>
+              <div class="small text-muted text-truncate" style="max-width: 200px;">{{ s.address_details|default:"No landmark" }}</div>
+            </td>
+            <td>
+              {% if s.assigned_engineer %}
+                <span class="small fw-semibold text-dark"><i class="bi bi-person-badge text-muted me-1"></i>{{ s.assigned_engineer.get_full_name|default:s.assigned_engineer.username }}</span>
+              {% else %}
+                <span class="small text-muted fst-italic">Unassigned</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.current_status == 'SAFE' %}
+                <span class="status-badge badge-safe"><i class="bi bi-check-circle-fill"></i> Safe</span>
+              {% elif s.current_status == 'CAUTION' %}
+                <span class="status-badge badge-caution"><i class="bi bi-exclamation-circle-fill"></i> Caution</span>
+              {% elif s.current_status == 'UNSAFE' %}
+                <span class="status-badge badge-unsafe"><i class="bi bi-exclamation-triangle-fill"></i> Unsafe</span>
+              {% else %}
+                <span class="status-badge badge-untested"><i class="bi bi-question-circle"></i> Untested</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if s.is_active %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-dot"></i> Active</span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm">
+                <a href="{% url 'core:source_detail' s.id %}" class="btn btn-outline-secondary" title="View Details & History">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if CAN_INPUT_RECORDS %}
+                  <a href="{% url 'core:record_create' %}?source={{ s.id }}" class="btn btn-outline-primary" title="Encode Water Test">
+                    <i class="bi bi-plus-lg"></i> Test
+                  </a>
+                {% endif %}
+                {% if CAN_MANAGE_SOURCES %}
+                  <a href="{% url 'core:source_edit' s.id %}" class="btn btn-outline-secondary" title="Edit Source">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-4 text-muted">
+              <i class="bi bi-geo-alt display-6 d-block mb-2"></i>
+              No water sources found matching your criteria.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+      <span class="small text-muted">Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} sources</span>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ query }}&type={{ selected_type }}&barangay={{ selected_barangay }}">Previous</a></li>
+          {% endif %}
+          <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ query }}&type={{ selected_type }}&barangay={{ selected_barangay }}">Next</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

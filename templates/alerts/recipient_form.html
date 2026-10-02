@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="{% url 'core:notification_recipients' %}">Notification Recipients</a></li>
+        <li class="breadcrumb-item active">{{ title }}</li>
+      </ol>
+    </nav>
+
+    <div class="card hp-card">
+      <div class="card-header">
+        <h5 class="mb-0 fw-bold"><i class="bi bi-person-badge me-2 text-primary"></i>{{ title }}</h5>
+      </div>
+      <div class="card-body">
+        <form method="post" id="recipient-form">
+          {% csrf_token %}
+
+          <!-- Personal Info -->
+          <h6 class="fw-semibold text-muted mb-3 text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Contact Information</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Full Name <span class="text-danger">*</span></label>
+              {{ form.name.errors }}
+              <input type="text" name="name" id="id_name"
+                     value="{% if form.name.value %}{{ form.name.value }}{% endif %}"
+                     class="form-control form-control-sm {% if form.name.errors %}is-invalid{% endif %}"
+                     placeholder="e.g., Juan Dela Cruz" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Role / Designation <span class="text-danger">*</span></label>
+              {{ form.role_title.errors }}
+              <input type="text" name="role_title" id="id_role_title"
+                     value="{% if form.role_title.value %}{{ form.role_title.value }}{% endif %}"
+                     class="form-control form-control-sm {% if form.role_title.errors %}is-invalid{% endif %}"
+                     placeholder="e.g., Barangay Health Officer">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Email Address</label>
+              {{ form.email.errors }}
+              <input type="email" name="email" id="id_email"
+                     value="{% if form.email.value %}{{ form.email.value }}{% endif %}"
+                     class="form-control form-control-sm {% if form.email.errors %}is-invalid{% endif %}"
+                     placeholder="juan@municipality.gov.ph">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-semibold">Phone Number (for SMS)</label>
+              {{ form.phone_number.errors }}
+              <input type="text" name="phone_number" id="id_phone_number"
+                     value="{% if form.phone_number.value %}{{ form.phone_number.value }}{% endif %}"
+                     class="form-control form-control-sm {% if form.phone_number.errors %}is-invalid{% endif %}"
+                     placeholder="+639XXXXXXXXX">
+            </div>
+          </div>
+
+          <!-- Notification Preferences -->
+          <h6 class="fw-semibold text-muted mb-3 text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Notification Channels</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="receive_email" id="id_receive_email"
+                       {% if form.receive_email.value %}checked{% endif %}>
+                <label class="form-check-label small" for="id_receive_email">
+                  <i class="bi bi-envelope me-1 text-primary"></i> Receive Email Alerts
+                </label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="receive_sms" id="id_receive_sms"
+                       {% if form.receive_sms.value %}checked{% endif %}>
+                <label class="form-check-label small" for="id_receive_sms">
+                  <i class="bi bi-phone me-1 text-info"></i> Receive SMS Alerts
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coverage Scope -->
+          <h6 class="fw-semibold text-muted mb-3 text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Alert Coverage Scope</h6>
+          <div class="mb-4">
+            <label class="form-label small fw-semibold">Barangay Filter</label>
+            <p class="text-muted small mb-1">Leave blank to receive alerts from all barangays in the municipality. Enter a specific barangay name to limit to that area only.</p>
+            {{ form.barangay_filter.errors }}
+            <input type="text" name="barangay_filter" id="id_barangay_filter"
+                   value="{% if form.barangay_filter.value %}{{ form.barangay_filter.value }}{% endif %}"
+                   class="form-control form-control-sm {% if form.barangay_filter.errors %}is-invalid{% endif %}"
+                   placeholder="e.g., San Isidro (leave blank for municipality-wide)">
+          </div>
+
+          <!-- Active status for edit mode -->
+          {% if is_edit %}
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="is_active" id="id_is_active"
+                       {% if form.is_active.value %}checked{% endif %}>
+                <label class="form-check-label small" for="id_is_active">
+                  <i class="bi bi-toggle-on me-1 text-success"></i> Active (receives alerts)
+                </label>
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- Form Actions -->
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm" id="btn-save-recipient">
+              <i class="bi bi-floppy me-1"></i> {% if is_edit %}Save Changes{% else %}Add Recipient{% endif %}
+            </button>
+            <a href="{% url 'core:notification_recipients' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

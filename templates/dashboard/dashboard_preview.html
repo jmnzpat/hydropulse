@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h3 class="fw-bold mb-1 text-dark"><i class="bi bi-speedometer2 text-primary me-2"></i> HydroPulse Staff Dashboard</h3>
+    <p class="text-muted mb-0 small">Welcome back, <strong>{{ user.get_full_name|default:user.username }}</strong> &bull; Role: {{ user.get_role_display }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if CAN_INPUT_RECORDS %}
+      <a href="{% url 'core:record_list' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i> Encode Test Record
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="hp-stat-card">
+      <div>
+        <div class="text-muted small fw-semibold">User Role</div>
+        <div class="fs-5 fw-bold text-dark mt-1">{{ user.get_role_display }}</div>
+        <div class="small text-muted mt-1">{{ user.barangay|default:"All Barangays" }}</div>
+      </div>
+      <div class="hp-stat-icon bg-primary bg-opacity-10 text-primary">
+        <i class="bi bi-person-badge"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="hp-stat-card">
+      <div>
+        <div class="text-muted small fw-semibold">Data Entry Status</div>
+        <div class="fs-5 fw-bold {% if CAN_INPUT_RECORDS %}text-success{% else %}text-secondary{% endif %} mt-1">
+          {% if CAN_INPUT_RECORDS %}Authorized{% else %}Monitor Only{% endif %}
+        </div>
+        <div class="small text-muted mt-1">{% if user.is_sanitation_engineer %}Sanitation Engineer{% elif user.is_health_officer %}Health Officer (Configured){% elif user.is_admin %}System Admin{% else %}Resident{% endif %}</div>
+      </div>
+      <div class="hp-stat-icon bg-success bg-opacity-10 text-success">
+        <i class="bi bi-pencil-square"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="hp-stat-card">
+      <div>
+        <div class="text-muted small fw-semibold">Active Advisories</div>
+        <div class="fs-5 fw-bold text-info mt-1">{{ ACTIVE_ADVISORIES_COUNT }}</div>
+        <div class="small text-muted mt-1">Public safety notices</div>
+      </div>
+      <div class="hp-stat-icon bg-info bg-opacity-10 text-info">
+        <i class="bi bi-megaphone"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="hp-stat-card">
+      <div>
+        <div class="text-muted small fw-semibold">Pending Alerts</div>
+        <div class="fs-5 fw-bold {% if PENDING_ALERTS_COUNT > 0 %}text-danger{% else %}text-muted{% endif %} mt-1">{{ PENDING_ALERTS_COUNT }}</div>
+        <div class="small text-muted mt-1">Require acknowledgment</div>
+      </div>
+      <div class="hp-stat-icon bg-danger bg-opacity-10 text-danger">
+        <i class="bi bi-bell"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="alert alert-light border shadow-sm p-4">
+  <div class="d-flex align-items-center mb-2">
+    <i class="bi bi-check-circle-fill text-success fs-4 me-2"></i>
+    <h5 class="fw-bold mb-0">Phase 1 Complete: Authentication & RBAC Active</h5>
+  </div>
+  <p class="text-muted mb-0">
+    HydroPulse database schema, custom user model, and Role-Based Access Control (RBAC) are fully initialized. Proceeding to Phase 2: Water Source and Water Quality Record Management + Safety Evaluation Engine.
+  </p>
+</div>
+{% endblock %}

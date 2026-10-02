@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Alert #{{ alert.id }} | HydroPulse{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+  <div>
+    <nav aria-label="breadcrumb">
+      <ol class="breadcrumb small mb-1">
+        <li class="breadcrumb-item"><a href="{% url 'core:alert_list' %}">Alerts</a></li>
+        <li class="breadcrumb-item active">Alert #{{ alert.id }}</li>
+      </ol>
+    </nav>
+    <h3 class="fw-bold mb-1 text-dark">
+      {% if alert.severity == 'CRITICAL' %}
+        <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+      {% else %}
+        <i class="bi bi-exclamation-circle-fill text-warning me-2"></i>
+      {% endif %}
+      {{ alert.severity }} Alert — {{ alert.source.name }}
+    </h3>
+    <p class="text-muted small mb-0">Brgy. {{ alert.source.barangay }} &bull; Detected {{ alert.created_at|date:"M d, Y H:i" }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if can_manage and alert.status == 'NEW' %}
+      <form method="post" action="{% url 'core:alert_acknowledge' alert.id %}">
+        {% csrf_token %}
+        <button class="btn btn-warning btn-sm" type="submit" id="btn-alert-ack-{{ alert.id }}">
+          <i class="bi bi-eye me-1"></i> Acknowledge
+        </button>
+      </form>
+    {% endif %}
+    <a href="{% url 'core:alert_list' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to Alerts
+    </a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Left Column: Alert Details & Status -->
+  <div class="col-lg-7">
+
+    <!-- Alert Summary Card -->
+    <div class="card hp-card mb-4
+      {% if alert.severity == 'CRITICAL' %}border-danger{% else %}border-warning{% endif %}">
+      <div class="card-header
+        {% if alert.severity == 'CRITICAL' %}bg-danger bg-opacity-10{% else %}bg-warning bg-opacity-10{% endif %}
+        d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold">Alert Summary</h6>
+        {% if alert.status == 'NEW' %}
+          <span class="badge bg-danger">⚡ New</span>
+        {% elif alert.status == 'ACKNOWLEDGED' %}
+          <span class="badge bg-warning text-dark">👁 Acknowledged</span>
+        {% else %}
+          <span class="badge bg-success">✔ Resolved</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <p class="mb-3 fw-semibold">{{ alert.summary }}</p>
+        <table class="table table-sm table-borderless">
+          <tr>
+            <th class="text-muted small w-50">Water Source</th>
+            <td><a href="{% url 'core:source_detail' alert.source.id %}">{{ alert.source.name }} ({{ alert.source.code }})</a></td>
+          </tr>
+          <tr>
+            <th class="text-muted small">Infrastructure Type</th>
+            <td>{{ alert.source.get_source_type_display }}</td>
+          </tr>
+          <tr>
+            <th class="text-muted small">Barangay</th>
+            <td>Brgy. {{ alert.source.barangay }}</td>
+          </tr>
+          <tr>
+            <th class="text-muted small">Alert Severity</th>
+            <td>
+              {% if alert.severity == 'CRITICAL' %}
+                <span class="badge bg-danger">CRITICAL</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">WARNING</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th class="text-muted small">Alert Created</th>
+            <td>{{ alert.created_at|date:"M d, Y H:i" }}</td>
+          </tr>
+          {% if alert.acknowledged_by %}
+            <tr>
+              <th class="text-muted small">Acknowledged By</th>
+              <td>{{ alert.acknowledged_by.get_full_name }} on {{ alert.acknowledged_at|date:"M d, Y H:i" }}</td>
+            </tr>
+          {% endif %}
+          {% if alert.resolved_by %}
+            <tr>
+              <th class="text-muted small">Resolved By</th>
+              <td>{{ alert.resolved_by.get_full_name }} on {{ alert.resolved_at|date:"M d, Y H:i" }}</td>
+            </tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+
+    <!-- Associated Test Record -->
+    {% if alert.record %}
+      <div class="card hp-card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h6 class="mb-0 fw-bold"><i class="bi bi-clipboard2-data me-1"></i> Associated Water Test Record</h6>
+          <a href="{% url 'core:record_detail' alert.record.id %}" class="btn btn-sm btn-outline-primary" id="btn-view-record-{{ alert.record.id }}">View Full Record</a>
+        </div>
+        <div class="card-body">
+          <div class="row g-3 text-center">
+            <div class="col-4">
+              <div class="p-2 rounded {% if alert.record.overall_status == 'UNSAFE' %}bg-danger bg-opacity-10{% elif alert.record.overall_status == 'CAUTION' %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                <div class="fw-bold fs-4">{{ alert.record.ph_level }}</div>
+                <div class="text-muted small">pH Level</div>
+                <div class="text-muted" style="font-size:.7rem">Safe: 6.5 – 8.5</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 rounded {% if alert.record.overall_status == 'UNSAFE' %}bg-danger bg-opacity-10{% elif alert.record.overall_status == 'CAUTION' %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                <div class="fw-bold fs-4">{{ alert.record.turbidity_ntu }}</div>
+                <div class="text-muted small">Turbidity (NTU)</div>
+                <div class="text-muted" style="font-size:.7rem">Max: 5.0 NTU</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="p-2 rounded {% if alert.record.overall_status == 'UNSAFE' %}bg-danger bg-opacity-10{% elif alert.record.overall_status == 'CAUTION' %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+                <div class="fw-bold fs-4">{{ alert.record.tds_ppm }}</div>
+                <div class="text-muted small">TDS (mg/L)</div>
+                <div class="text-muted" style="font-size:.7rem">Max: 600 mg/L</div>
+              </div>
+            </div>
+          </div>
+          {% if alert.record.notes %}
+            <p class="mt-3 mb-0 small text-muted"><strong>Field Notes:</strong> {{ alert.record.notes }}</p>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Resolve Form (shown if not yet resolved and user can manage) -->
+    {% if can_manage and alert.status != 'RESOLVED' and resolution_form %}
+      <div class="card hp-card border-success">
+        <div class="card-header bg-success bg-opacity-10">
+          <h6 class="mb-0 fw-bold text-success"><i class="bi bi-check2-all me-1"></i> Resolve Alert</h6>
+        </div>
+        <div class="card-body">
+          <p class="small text-muted mb-3">
+            Record the remediation actions taken (e.g., flushing, water treatment, infrastructure repair).
+            This documents compliance with SDG 6 monitoring protocols.
+          </p>
+          <form method="post" action="{% url 'core:alert_resolve' alert.id %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">Resolution Notes <span class="text-danger">*</span></label>
+              <textarea name="resolution_notes" class="form-control form-control-sm" rows="4"
+                        placeholder="Describe actions taken: e.g., Source flushed and chlorinated. Retest scheduled for Oct 5. Residents advised to boil water until clearance." required
+                        id="resolution-notes-input"></textarea>
+            </div>
+            <button type="submit" class="btn btn-success btn-sm" id="btn-resolve-alert-{{ alert.id }}">
+              <i class="bi bi-check2-circle me-1"></i> Mark as Resolved
+            </button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if alert.resolution_notes %}
+      <div class="card hp-card border-success mt-4">
+        <div class="card-header bg-success bg-opacity-10">
+          <h6 class="mb-0 fw-bold text-success"><i class="bi bi-journal-check me-1"></i> Resolution Notes</h6>
+        </div>
+        <div class="card-body">
+          <p class="mb-0 small">{{ alert.resolution_notes }}</p>
+        </div>
+      </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right Column: Notification Dispatch Log -->
+  <div class="col-lg-5">
+    <div class="card hp-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-send me-1"></i> Notification Dispatch Log</h6>
+        <span class="badge bg-secondary">{{ notifications|length }}</span>
+      </div>
+      <div class="card-body p-0">
+        {% if notifications %}
+          <ul class="list-group list-group-flush">
+            {% for log in notifications %}
+              <li class="list-group-item px-3 py-2">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <span class="fw-semibold small">{{ log.recipient_name }}</span>
+                    <br>
+                    <span class="badge
+                      {% if log.channel == 'EMAIL' %}bg-primary{% else %}bg-info text-dark{% endif %}
+                      me-1" style="font-size:.65rem">{{ log.channel }}</span>
+                    <span class="badge
+                      {% if log.status == 'SENT' %}bg-success
+                      {% elif log.status == 'MOCKED' %}bg-secondary
+                      {% else %}bg-danger{% endif %}"
+                      style="font-size:.65rem">{{ log.status }}</span>
+                    <br>
+                    <small class="text-muted" style="font-size:.7rem">{{ log.destination }}</small>
+                  </div>
+                  <small class="text-muted text-end" style="font-size:.7rem">{{ log.sent_at|date:"M d H:i" }}</small>
+                </div>
+                {% if log.error_message %}
+                  <div class="mt-1 small text-danger"><i class="bi bi-x-circle me-1"></i>{{ log.error_message }}</div>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-bell-slash display-6 d-block mb-2 opacity-50"></i>
+            <p class="small mb-0">No notifications dispatched for this alert yet.</p>
+            <p class="small">Add recipients via <a href="{% url 'core:notification_recipients' %}">Notification Settings</a>.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

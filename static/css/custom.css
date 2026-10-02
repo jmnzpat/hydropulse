@@ -1,0 +1,244 @@
+/* HydroPulse Design System & Custom CSS */
+:root {
+  --hp-primary-dark: #091e3a;
+  --hp-primary: #0077b6;
+  --hp-primary-light: #0096c7;
+  --hp-cyan: #00b4d8;
+  --hp-cyan-subtle: #e0f2fe;
+  
+  --hp-safe: #059669;
+  --hp-safe-bg: #ecfdf5;
+  --hp-safe-border: #a7f3d0;
+  
+  --hp-caution: #d97706;
+  --hp-caution-bg: #fffbeb;
+  --hp-caution-border: #fde68a;
+  
+  --hp-unsafe: #dc2626;
+  --hp-unsafe-bg: #fef2f2;
+  --hp-unsafe-border: #fecaca;
+  
+  --hp-surface: #ffffff;
+  --hp-bg: #f8fafc;
+  --hp-border: #e2e8f0;
+  --hp-text-main: #1e293b;
+  --hp-text-muted: #64748b;
+  
+  --hp-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --hp-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --hp-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --hp-shadow-card: 0 20px 25px -5px rgba(15, 23, 42, 0.05), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--hp-bg);
+  color: var(--hp-text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.hp-navbar {
+  background: linear-gradient(135deg, var(--hp-primary-dark) 0%, #0c2d48 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.hp-brand {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-size: 1.35rem;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hp-brand-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  box-shadow: 0 0 12px rgba(0, 180, 216, 0.4);
+}
+
+.hp-nav-link {
+  color: #cbd5e1 !important;
+  font-weight: 500;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.85rem !important;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.hp-nav-link:hover, .hp-nav-link.active {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* User Role Badges */
+.badge-role-admin {
+  background-color: #6366f1;
+  color: white;
+}
+.badge-role-health {
+  background-color: #0284c7;
+  color: white;
+}
+.badge-role-engineer {
+  background-color: #059669;
+  color: white;
+}
+.badge-role-resident {
+  background-color: #64748b;
+  color: white;
+}
+
+/* Water Quality Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-safe {
+  background-color: var(--hp-safe-bg);
+  color: var(--hp-safe);
+  border: 1px solid var(--hp-safe-border);
+}
+
+.badge-caution {
+  background-color: var(--hp-caution-bg);
+  color: var(--hp-caution);
+  border: 1px solid var(--hp-caution-border);
+}
+
+.badge-unsafe {
+  background-color: var(--hp-unsafe-bg);
+  color: var(--hp-unsafe);
+  border: 1px solid var(--hp-unsafe-border);
+  animation: pulse-unsafe 2s infinite ease-in-out;
+}
+
+.badge-untested {
+  background-color: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+@keyframes pulse-unsafe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.2); }
+  50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.15); }
+}
+
+/* Cards */
+.hp-card {
+  background-color: var(--hp-surface);
+  border: 1px solid var(--hp-border);
+  border-radius: 12px;
+  box-shadow: var(--hp-shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hp-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--hp-shadow-lg);
+}
+
+.hp-stat-card {
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: white;
+  border: 1px solid var(--hp-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hp-stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+/* Forms */
+.form-control:focus, .form-select:focus {
+  border-color: var(--hp-cyan);
+  box-shadow: 0 0 0 0.25rem rgba(0, 180, 216, 0.2);
+}
+
+.btn-primary {
+  background-color: var(--hp-primary);
+  border-color: var(--hp-primary);
+  font-weight: 500;
+}
+
+.btn-primary:hover {
+  background-color: #005f92;
+  border-color: #005f92;
+}
+
+.btn-cyan {
+  background-color: var(--hp-cyan);
+  border-color: var(--hp-cyan);
+  color: #fff;
+}
+.btn-cyan:hover {
+  background-color: #0096c7;
+  color: #fff;
+}
+
+/* SDG Banner */
+.sdg-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.sdg-6 { background-color: #00a0dc; color: #fff; }
+.sdg-3 { background-color: #4c9f38; color: #fff; }
+
+/* Footer */
+.hp-footer {
+  margin-top: auto;
+  background: #091e3a;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Print Styles */
+@media print {
+  .no-print, .hp-navbar, .hp-footer, .btn, .pagination {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .hp-card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
