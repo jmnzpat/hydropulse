@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -70,10 +71,22 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database Configuration
-# Supports SQLite for frictionless student/dev setup, and MySQL for production/demonstration.
-DB_ENGINE_CHOICE = os.getenv('DB_ENGINE', 'sqlite').lower()
+# Supports:
+# 1. DATABASE_URL (Cloud PostgreSQL on Neon, Supabase, Vercel Postgres)
+# 2. MySQL (local XAMPP / production)
+# 3. SQLite (zero-setup student / dev fallback)
+DATABASE_URL = os.getenv('DATABASE_URL')
 
-if DB_ENGINE_CHOICE == 'mysql':
+if DATABASE_URL:
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+elif os.getenv('DB_ENGINE', 'sqlite').lower() == 'mysql':
     try:
         import pymysql
         pymysql.install_as_MySQLdb()
@@ -95,12 +108,22 @@ if DB_ENGINE_CHOICE == 'mysql':
         }
     }
 else:
+    # Use system temp directory on Vercel serverless to avoid read-only filesystem errors
+    if os.getenv('VERCEL'):
+        import tempfile
+        db_path = Path(tempfile.gettempdir()) / 'hydropulse_db.sqlite3'
+    else:
+        db_path = BASE_DIR / 'db.sqlite3'
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': db_path,
         }
     }
+
+
+
 
 
 # Custom User Model
@@ -137,6 +160,18 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise production static file handling
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+WHITENOISE_MANIFEST_STRICT = False
+
 
 # Media files (for report logos, attachments)
 MEDIA_URL = '/media/'
