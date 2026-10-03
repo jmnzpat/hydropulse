@@ -18,7 +18,11 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key-hydropulse-2026')
 
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',') if host.strip()] + ['testserver']
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',') if host.strip()] + [
+    'testserver',           # Django test client
+    'hydropulse-theta.vercel.app',   # Vercel production deployment
+    '.vercel.app',          # All Vercel preview deployments (wildcard)
+]
 
 
 # Application definition
